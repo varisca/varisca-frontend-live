@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -9,15 +9,24 @@ import { cn } from '@/lib/utils';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated } = useAuth();
+  const { requestEmailOtp, verifyEmailOtp, isAuthenticated, loading } = useAuth();
   
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [cooldownLeft, setCooldownLeft] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const from = (location.state as any)?.from?.pathname || '/account';
+
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const t = window.setInterval(() => setCooldownLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => window.clearInterval(t);
+  }, [cooldownLeft]);
 
   // Redirect if already logged in
   if (isAuthenticated) {
@@ -25,23 +34,50 @@ const Login = () => {
     return null;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    if (!email || !password) {
-      setError('Please fill in all fields');
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Please enter your first and last name');
+      return;
+    }
+    if (!email) {
+      setError('Please enter your email');
       return;
     }
 
     setIsLoading(true);
-    const success = await login(email, password);
+    const res = await requestEmailOtp({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.trim(),
+    });
     setIsLoading(false);
 
-    if (success) {
+    if (res.ok) {
+      setStep('otp');
+      setCooldownLeft(res.resendAfterSeconds);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!otp.trim()) {
+      setError('Please enter the OTP');
+      return;
+    }
+
+    setIsLoading(true);
+    const ok = await verifyEmailOtp(email, otp.trim());
+    setIsLoading(false);
+
+    if (ok) {
       navigate(from, { replace: true });
     } else {
-      setError('Invalid email or password');
+      setError('Invalid OTP');
     }
   };
 
@@ -67,12 +103,39 @@ const Login = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp} className="space-y-6">
             {error && (
               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
                 {error}
               </div>
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">First name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  disabled={step === 'otp'}
+                  autoComplete="given-name"
+                  className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Last name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  disabled={step === 'otp'}
+                  autoComplete="family-name"
+                  className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                  placeholder="Last name"
+                />
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>
@@ -80,43 +143,62 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                disabled={step === 'otp'}
+                autoComplete="email"
                 className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="you@example.com"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <div className="relative">
+            {step === 'otp' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">OTP</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full h-12 px-4 pr-12 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="••••••••"
+                  inputMode="numeric"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value)}
+                  className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent tracking-widest text-center text-lg"
+                  placeholder="Enter OTP"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+                <div className="flex items-center justify-between mt-3 text-sm">
+                  <button
+                    type="button"
+                    className={cn(
+                      'text-accent hover:underline font-medium',
+                      (cooldownLeft > 0 || isLoading || loading) && 'opacity-50 pointer-events-none',
+                    )}
+                    onClick={async () => {
+                      setError('');
+                      const res = await requestEmailOtp({
+                        first_name: firstName.trim(),
+                        last_name: lastName.trim(),
+                        email: email.trim(),
+                      });
+                      if (res.ok) setCooldownLeft(res.resendAfterSeconds);
+                    }}
+                  >
+                    Resend OTP{cooldownLeft > 0 ? ` (${cooldownLeft}s)` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setStep('email');
+                      setOtp('');
+                    }}
+                  >
+                    Edit details
+                  </button>
+                </div>
               </div>
-              <Link 
-                to="/forgot-password" 
-                className="block mt-2 text-sm text-accent hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+            )}
 
             <Button 
               type="submit" 
               variant="accent" 
               size="lg" 
               className="w-full"
-              disabled={isLoading}
+              disabled={isLoading || loading}
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -124,12 +206,12 @@ const Login = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Signing in...
+                  {step === 'email' ? 'Sending OTP...' : 'Verifying...'}
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Sign In
-                  <ArrowRight size={18} />
+                  {step === 'email' ? 'Send OTP' : 'Verify & Sign In'}
+                  {step === 'email' ? <Mail size={18} /> : <ArrowRight size={18} />}
                 </span>
               )}
             </Button>

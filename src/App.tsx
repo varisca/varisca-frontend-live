@@ -73,6 +73,7 @@ import RefundLogs from "./pages/admin/finance/RefundLogs";
 import DeliveryZones from "./pages/admin/shipping/DeliveryZones";
 import ShippingCharges from "./pages/admin/shipping/ShippingCharges";
 import DeliveryPartners from "./pages/admin/shipping/DeliveryPartners";
+import DeliveryWarehouses from "./pages/admin/delivery/DeliveryWarehouses";
 
 // Admin Pages — Reports
 import SalesReport from "./pages/admin/reports/SalesReport";
@@ -154,6 +155,9 @@ const App = () => (
                         <Route path="shipping/zones" element={<DeliveryZones />} />
                         <Route path="shipping/charges" element={<ShippingCharges />} />
                         <Route path="shipping/partners" element={<DeliveryPartners />} />
+
+                        {/* Delivery (Delhivery / logistics) */}
+                        <Route path="delivery/warehouses" element={<DeliveryWarehouses />} />
 
                         {/* Reports */}
                         <Route path="reports/sales" element={<SalesReport />} />

@@ -14,6 +14,8 @@ export interface Address {
   type: 'home' | 'work' | 'other';
   isDefault?: boolean;
   is_default?: boolean; // map from DB
+  /** Set by Delhivery pincode check when continuing checkout */
+  pincode_servicable?: boolean;
 }
 
 interface AddressContextType {
@@ -25,6 +27,8 @@ interface AddressContextType {
   selectAddress: (id: string) => void;
   setDefaultAddress: (id: string) => Promise<void>;
   getSelectedAddress: () => Address | undefined;
+  /** Merge server fields into a saved address (e.g. after pincode verify) without a full PUT. */
+  mergeAddress: (id: string, patch: Partial<Address>) => void;
   loading: boolean;
 }
 
@@ -46,10 +50,52 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setLoading(true);
         try {
           const data = await api.get<Address[]>(`/customers/${user.id}/addresses`);
+
+          const savedGuest = localStorage.getItem(STORAGE_KEY);
+          const parsedGuest: { addresses?: Address[]; selectedAddressId?: string | null } | null = savedGuest
+            ? (() => {
+                try {
+                  return JSON.parse(savedGuest);
+                } catch {
+                  return null;
+                }
+              })()
+            : null;
+
+          const guestAddresses = (parsedGuest?.addresses || []).filter(Boolean);
+          const guestSelectedId = parsedGuest?.selectedAddressId || null;
+
+          // If customer has no addresses yet, migrate any guest-saved addresses into the account.
+          // This preserves the address-details data users entered before being forced to login.
+          if (data.length === 0 && guestAddresses.length > 0) {
+            const created: Address[] = [];
+            let selectedAfter: string | null = null;
+
+            for (const g of guestAddresses) {
+              const { id: _id, is_default: _is_default, ...rest } = g as any;
+              const payload = { ...rest, is_default: !!g.isDefault };
+              const newAddr = await api.post<Address>(`/customers/${user.id}/addresses`, payload);
+              newAddr.isDefault = newAddr.is_default || newAddr.isDefault;
+              created.push(newAddr);
+
+              if (guestSelectedId && g.id === guestSelectedId) {
+                selectedAfter = newAddr.id;
+              }
+            }
+
+            localStorage.removeItem(STORAGE_KEY);
+
+            const def = created.find(a => a.isDefault);
+            setAddresses(created);
+            setSelectedAddressId(selectedAfter || def?.id || created[0]?.id || null);
+            toast.success('Saved address restored', { description: 'We restored your saved address after login.' });
+            return;
+          }
+
           // map is_default to isDefault for frontend usage
           const mapped = data.map(a => ({ ...a, isDefault: a.is_default || a.isDefault }));
           setAddresses(mapped);
-          
+
           const def = mapped.find(a => a.isDefault);
           if (def) setSelectedAddressId(def.id);
           else if (mapped.length > 0 && !selectedAddressId) setSelectedAddressId(mapped[0].id);
@@ -175,6 +221,17 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return addresses.find(a => a.id === selectedAddressId);
   }, [addresses, selectedAddressId]);
 
+  const mergeAddress = useCallback((id: string, patch: Partial<Address>) => {
+    setAddresses(prev =>
+      prev.map(a => {
+        if (a.id !== id) return a;
+        const next = { ...a, ...patch };
+        if (patch.is_default !== undefined) next.isDefault = !!patch.is_default;
+        return next;
+      }),
+    );
+  }, []);
+
   return (
     <AddressContext.Provider value={{
       addresses,
@@ -185,6 +242,7 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
       selectAddress,
       setDefaultAddress,
       getSelectedAddress,
+      mergeAddress,
       loading
     }}>
       {children}

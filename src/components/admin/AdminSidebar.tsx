@@ -7,9 +7,10 @@ import {
   LayoutDashboard, ShoppingBag, Package, Users, BarChart3, Settings, Shirt,
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles,
   Tags, Palette, Box, Layers, RotateCcw, CreditCard,
-  Truck, MapPin, DollarSign, IndianRupee, FileText, Megaphone, Image,
+  Truck, MapPin, DollarSign,   IndianRupee, FileText, Megaphone, Image,
   Mail, UserCog, Shield, Wallet, Receipt, Bell,
   TrendingUp, PieChart, UsersRound, Globe, BadgePercent,
+  Building2,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -107,6 +108,20 @@ const sidebarSections: SidebarSection[] = [
       { label: 'Delivery Zones', icon: MapPin, href: '/admin/shipping/zones', permission: 'shipping.zones.manage' },
       { label: 'Shipping Charges', icon: IndianRupee, href: '/admin/shipping/charges', permission: 'shipping.charges.manage' },
       { label: 'Delivery Partners', icon: Truck, href: '/admin/shipping/partners', permission: 'shipping.partners.manage' },
+    ],
+  },
+  {
+    key: 'delivery',
+    label: 'Delivery',
+    icon: Building2,
+    permission: 'shipping.view',
+    items: [
+      {
+        label: 'Warehouses',
+        icon: Building2,
+        href: '/admin/delivery/warehouses',
+        permission: 'shipping.partners.manage',
+      },
     ],
   },
   {

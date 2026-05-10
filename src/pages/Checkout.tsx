@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Trash2, Minus, Plus, MapPin, CreditCard, 
-  Truck, Home, Briefcase, Building2, LogIn, Check, ChevronRight,
+  Truck, Home, Briefcase, Building2, Check, ChevronRight,
   ShoppingBag, Tag, Smartphone,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { useAddress, Address } from '@/context/AddressContext';
+import { useAddress, type Address } from '@/context/AddressContext';
 import { useCoupon } from '@/context/CouponContext';
 import { useToastNotifications } from '@/hooks/useToastNotifications';
 import { formatPrice } from '@/lib/data';
@@ -19,6 +19,8 @@ import {
   loadRazorpayScript,
   verifyRazorpayPayment,
 } from '@/lib/paymentApi';
+import { customerApi } from '@/lib/api/client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -30,8 +32,8 @@ type CheckoutPayMode = 'razorpay';
 const Checkout = () => {
   const navigate = useNavigate();
   const { items, totalPrice, clearCart, removeFromCart, updateQuantity, updateItemOptions } = useCart();
-  const { isAuthenticated, user } = useAuth();
-  const { addresses, addAddress, removeAddress, selectedAddressId, selectAddress, getSelectedAddress } = useAddress();
+  const { isAuthenticated, user, requestEmailOtp, verifyEmailOtp, loading: authLoading } = useAuth();
+  const { addresses, addAddress, removeAddress, selectedAddressId, selectAddress, getSelectedAddress, mergeAddress } = useAddress();
   const { appliedCoupon, applyCoupon, removeCoupon, calculateDiscount } = useCoupon();
   const { showCouponApplied, showCouponError, showRemovedFromCart, showOrderPlaced, showOrderError } = useToastNotifications();
   
@@ -50,9 +52,25 @@ const Checkout = () => {
     type: 'home' as 'home' | 'work' | 'other',
   });
   const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+  const [pincodeCheckLoading, setPincodeCheckLoading] = useState(false);
 
   const discount = calculateDiscount(totalPrice);
   const finalTotal = totalPrice - discount;
+
+  // Checkout OTP Gate (guest → email OTP → authenticated)
+  const [authFirstName, setAuthFirstName] = useState('');
+  const [authLastName, setAuthLastName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authOtp, setAuthOtp] = useState('');
+  const [authStep, setAuthStep] = useState<'email' | 'otp'>('email');
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    if (cooldownLeft <= 0) return;
+    const t = window.setInterval(() => setCooldownLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => window.clearInterval(t);
+  }, [cooldownLeft]);
 
   const steps: { id: CheckoutStep; label: string; icon: typeof ShoppingBag }[] = [
     { id: 'bag', label: 'BAG', icon: ShoppingBag },
@@ -103,14 +121,24 @@ const Checkout = () => {
     const addressStr = selectedAddr
       ? `${selectedAddr.address}, ${selectedAddr.city}, ${selectedAddr.state} - ${selectedAddr.pincode}`
       : '';
+
+    const nameFromAddress = selectedAddr?.name || '';
+    const nameFromUser = `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
+    const customerName =
+      (isAuthenticated ? nameFromUser : '') ||
+      nameFromAddress ||
+      (user?.email ? user.email.split('@')[0] : 'Guest');
+
+    const email = user?.email || '';
+
     return {
       selectedAddr,
       addressStr,
       payload: {
-        customer_id: user!.id,
-        customer_name: `${user!.first_name || ''} ${user!.last_name || ''}`.trim() || selectedAddr?.name || user!.email.split('@')[0],
-        customer_email: user!.email,
-        customer_phone: selectedAddr?.phone || user!.phone || '',
+        customer_id: isAuthenticated ? user?.id : undefined,
+        customer_name: customerName,
+        customer_email: email,
+        customer_phone: selectedAddr?.phone || (isAuthenticated ? user?.phone : '') || '',
         total: finalTotal,
         subtotal: totalPrice,
         discount: discount,
@@ -145,6 +173,11 @@ const Checkout = () => {
 
   const handlePlaceOrder = async () => {
     if (!isAuthenticated || !user) return;
+    if (!getSelectedAddress()) {
+      showOrderError('Please select a delivery address');
+      return;
+    }
+
     setIsProcessing(true);
 
     const { addressStr, payload } = buildOrderPayload();
@@ -182,7 +215,10 @@ const Checkout = () => {
         prefill: {
           email: user.email,
           contact: getSelectedAddress()?.phone || user.phone || '',
-          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || undefined,
+          name:
+            `${user.first_name || ''} ${user.last_name || ''}`.trim() ||
+            getSelectedAddress()?.name ||
+            undefined,
         },
         theme: { color: '#ea580c' },
         modal: {
@@ -256,6 +292,172 @@ const Checkout = () => {
           <Button asChild>
             <Link to="/shop">Continue Shopping</Link>
           </Button>
+        </div>
+      </main>
+    );
+  }
+
+  // Require email OTP auth before checkout steps
+  if (!isAuthenticated) {
+    const disabled = authLoading || isProcessing;
+
+    return (
+      <main className="min-h-screen bg-muted/30">
+        <div className="container-custom py-10">
+          <div className="max-w-lg mx-auto bg-background rounded-xl border border-border p-6">
+            <h1 className="text-xl font-display font-bold mb-1">Verify your email to continue</h1>
+            <p className="text-sm text-muted-foreground mb-6">
+              Enter your name and email. We’ll send an OTP to your email to continue to checkout.
+            </p>
+
+            {authError && (
+              <div className="p-3 mb-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                {authError}
+              </div>
+            )}
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthError('');
+
+                if (authStep === 'email') {
+                  if (!authFirstName.trim() || !authLastName.trim()) {
+                    setAuthError('Please enter your first and last name');
+                    return;
+                  }
+                  if (!authEmail.trim()) {
+                    setAuthError('Please enter your email');
+                    return;
+                  }
+
+                  const res = await requestEmailOtp({
+                    first_name: authFirstName.trim(),
+                    last_name: authLastName.trim(),
+                    email: authEmail.trim(),
+                  });
+                  if (res.ok) {
+                    setAuthStep('otp');
+                    setCooldownLeft(res.resendAfterSeconds);
+                  } else {
+                    setAuthError(res.error || 'Could not send OTP');
+                  }
+                  return;
+                }
+
+                // otp
+                if (!authOtp.trim()) {
+                  setAuthError('Please enter the OTP');
+                  return;
+                }
+
+                const ok = await verifyEmailOtp(authEmail.trim(), authOtp.trim());
+                if (!ok) {
+                  setAuthError('Invalid OTP');
+                } else {
+                  setAuthOtp('');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">First name</label>
+                  <input
+                    type="text"
+                    value={authFirstName}
+                    onChange={(e) => setAuthFirstName(e.target.value)}
+                    disabled={disabled || authStep === 'otp'}
+                    autoComplete="given-name"
+                    className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                    placeholder="First name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Last name</label>
+                  <input
+                    type="text"
+                    value={authLastName}
+                    onChange={(e) => setAuthLastName(e.target.value)}
+                    disabled={disabled || authStep === 'otp'}
+                    autoComplete="family-name"
+                    className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                    placeholder="Last name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  disabled={disabled || authStep === 'otp'}
+                  autoComplete="email"
+                  className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              {authStep === 'otp' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">OTP</label>
+                  <input
+                    inputMode="numeric"
+                    value={authOtp}
+                    onChange={(e) => setAuthOtp(e.target.value)}
+                    disabled={disabled}
+                    className="w-full h-12 px-4 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent tracking-widest text-center text-lg"
+                    placeholder="Enter OTP"
+                  />
+
+                  <div className="flex items-center justify-between mt-3 text-sm">
+                    <button
+                      type="button"
+                      className={cn(
+                        'text-accent hover:underline font-medium',
+                        (cooldownLeft > 0 || disabled) && 'opacity-50 pointer-events-none',
+                      )}
+                      onClick={async () => {
+                        setAuthError('');
+                        const res = await requestEmailOtp({
+                          first_name: authFirstName.trim(),
+                          last_name: authLastName.trim(),
+                          email: authEmail.trim(),
+                        });
+                        if (res.ok) setCooldownLeft(res.resendAfterSeconds);
+                      }}
+                    >
+                      Resend OTP{cooldownLeft > 0 ? ` (${cooldownLeft}s)` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setAuthStep('email');
+                        setAuthOtp('');
+                      }}
+                    >
+                      Edit details
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <Button type="submit" variant="accent" size="lg" className="w-full" disabled={disabled}>
+                {authStep === 'email' ? 'Send OTP' : 'Verify & Continue'}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/cart')}
+                className="w-full text-sm text-muted-foreground hover:text-foreground"
+              >
+                Back to cart
+              </button>
+            </form>
+          </div>
         </div>
       </main>
     );
@@ -614,6 +816,19 @@ const Checkout = () => {
                       Choose how you want to pay. Online payments open a secure Razorpay window — UPI, cards, and net banking are supported.
                     </p>
 
+                    {!isAuthenticated && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Email (for order confirmation)</label>
+                        <input
+                          type="email"
+                          value={guestEmail}
+                          onChange={(e) => setGuestEmail(e.target.value)}
+                          className="w-full h-10 px-3 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                    )}
+
                     <div className="space-y-3" role="radiogroup" aria-label="Payment method">
                       <button
                         type="button"
@@ -723,29 +938,15 @@ const Checkout = () => {
 
               {/* Action Button */}
               {step === 'bag' && (
-                isAuthenticated ? (
-                  <Button 
-                    variant="accent" 
-                    size="lg" 
-                    className="w-full"
-                    onClick={() => setStep('address')}
-                    disabled={items.length === 0}
-                  >
-                    PLACE ORDER
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <Button variant="accent" size="lg" className="w-full" asChild>
-                      <Link to="/login?redirect=checkout" className="gap-2">
-                        <LogIn size={18} />
-                        LOGIN TO PLACE ORDER
-                      </Link>
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Login required to proceed with checkout
-                    </p>
-                  </div>
-                )
+                <Button 
+                  variant="accent" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => setStep('address')}
+                  disabled={items.length === 0}
+                >
+                  PLACE ORDER
+                </Button>
               )}
 
               {step === 'address' && (
@@ -753,39 +954,62 @@ const Checkout = () => {
                   variant="accent" 
                   size="lg" 
                   className="w-full"
-                  onClick={() => setStep('payment')}
-                  disabled={!selectedAddressId}
+                  onClick={async () => {
+                    if (!selectedAddressId || !user?.id) {
+                      toast.error('Select an address to continue.');
+                      return;
+                    }
+                    const sel = getSelectedAddress();
+                    if (!sel?.pincode?.replace(/\D/g, '') || sel.pincode.replace(/\D/g, '').length < 6) {
+                      toast.error('Please enter a valid 6-digit pincode on your delivery address.');
+                      return;
+                    }
+                    if (String(sel.id).startsWith('addr_')) {
+                      toast.error('Save your address to your account before continuing.', {
+                        description: 'Use “Save Address” on the form above.',
+                      });
+                      return;
+                    }
+                    setPincodeCheckLoading(true);
+                    try {
+                      const res = await customerApi.post<{
+                        serviceable: boolean;
+                        address: Address;
+                      }>(`/customers/auth/addresses/${selectedAddressId}/verify-pincode`, {});
+                      if (!res.serviceable) {
+                        mergeAddress(selectedAddressId, { pincode_servicable: false });
+                        toast.error('Sorry, delivery is not available at this pincode.', {
+                          description: 'Service is not available at your location. Try another pincode or address.',
+                        });
+                        return;
+                      }
+                      mergeAddress(selectedAddressId, { pincode_servicable: true });
+                      setStep('payment');
+                    } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : 'Could not verify pincode.';
+                      toast.error(msg);
+                    } finally {
+                      setPincodeCheckLoading(false);
+                    }
+                  }}
+                  disabled={!selectedAddressId || pincodeCheckLoading || isProcessing}
                 >
-                  CONTINUE
+                  {pincodeCheckLoading ? 'Checking…' : 'CONTINUE'}
                 </Button>
               )}
 
               {step === 'payment' && (
-                isAuthenticated ? (
-                  <Button 
-                    variant="accent" 
-                    size="lg" 
-                    className="w-full"
-                    onClick={handlePlaceOrder}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing
-                      ? 'Processing...'
-                      : `PAY ${formatPrice(finalTotal)}`}
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <Button variant="accent" size="lg" className="w-full" asChild>
-                      <Link to="/login?redirect=checkout" className="gap-2">
-                        <LogIn size={18} />
-                        Login to Place Order
-                      </Link>
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Please login to complete your purchase
-                    </p>
-                  </div>
-                )
+                <Button 
+                  variant="accent" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={handlePlaceOrder}
+                  disabled={isProcessing}
+                >
+                  {isProcessing
+                    ? 'Processing...'
+                    : `PAY ${formatPrice(finalTotal)}`}
+                </Button>
               )}
             </div>
           </div>

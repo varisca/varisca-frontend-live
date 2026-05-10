@@ -429,6 +429,20 @@ export const customerAuthApi = {
     setCustomerToken(res.token);
     return res;
   },
+  requestEmailOtp: async (body: { first_name: string; last_name: string; email: string }) => {
+    return customerRequest<{ email: string; expiresInSeconds: number; resendAfterSeconds: number }>(
+      '/customers/auth/otp/email/request',
+      { method: 'POST', body },
+    );
+  },
+  verifyEmailOtp: async (email: string, otp: string) => {
+    const res = await customerRequest<{ token: string; customer: any; isNewCustomer: boolean }>(
+      '/customers/auth/otp/email/verify',
+      { method: 'POST', body: { email, otp } },
+    );
+    setCustomerToken(res.token);
+    return res;
+  },
   me: () => customerRequest<any>('/customers/auth/me'),
   /** Persist profile to DB (requires customer JWT). */
   updateProfile: (body: {
