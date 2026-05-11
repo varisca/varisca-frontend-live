@@ -2,9 +2,7 @@
 // ─── API Client ─────────────────────────────────────────────────────
 // Centralized HTTP client for backend API calls with JWT auth.
 
-/** Fallback when no env is set in production (custom domain; avoid *.railway.app DNS issues on some ISPs). */
-// const DEFAULT_PROD_BACKEND = 'https://api.varisca.in/api';
-const DEFAULT_PROD_BACKEND = 'https://varisca-backend-live.vercel.app/api';
+const DEV_API_BASE = 'http://localhost:3001/api';
 
 function stripQuotes(s: string): string {
   return s.replace(/^['"]+|['"]+$/g, '').trim();
@@ -12,8 +10,8 @@ function stripQuotes(s: string): string {
 
 /**
  * Turn VITE_API_URL (origin) or full URL into the API root used by this app (`.../api`).
- * - https://api.varisca.in → https://api.varisca.in/api
- * - https://api.varisca.in/api → unchanged (trailing slashes stripped)
+ * - https://example.com → https://example.com/api
+ * - https://example.com/api → unchanged (trailing slashes stripped)
  * - /api → relative, unchanged
  */
 export function normalizeToApiRoot(input: string): string {
@@ -35,42 +33,25 @@ export function normalizeToApiRoot(input: string): string {
   }
 }
 
-/** First non-empty env wins: VITE_API_URL, then legacy VITE_API_BASE_URL / VITE_API_BASE / VITE_API_BACKEND_URL. */
+/** VITE_API_URL is the canonical API origin for production builds. */
 function getConfiguredApiRoot(): string {
   const env = import.meta.env;
-  const candidates = [
-    env.VITE_API_URL,
-    env.VITE_API_BASE_URL,
-    env.VITE_API_BASE,
-    env.VITE_API_BACKEND_URL,
-  ];
-  for (const c of candidates) {
-    const raw = stripQuotes(String(c ?? ''));
-    if (raw) return normalizeToApiRoot(raw);
-  }
-  return '';
+  const raw = stripQuotes(String(env.VITE_API_URL ?? ''));
+  return raw ? normalizeToApiRoot(raw) : '';
 }
 
 /**
  * Resolve API base URL (always ends with `/api` when absolute HTTP(S)).
- * - Admin on static hosts needs an absolute URL (e.g. https://api.varisca.in/api).
+ * - Admin on static hosts needs an absolute URL from VITE_API_URL.
  * - Storefront can use relative `/api` if you configure a reverse proxy.
  * - Dev on LAN: same host :3001 for phone testing.
  */
 export function getApiBase(): string {
   const env = import.meta.env;
   const configured = getConfiguredApiRoot();
-  const adminUrl = normalizeToApiRoot(stripQuotes(String(env.VITE_API_ADMIN_URL ?? '')));
 
   if (typeof window === 'undefined') {
-    return configured || 'http://localhost:3001/api';
-  }
-
-  // Optional: set in public/varisca-api-config.js on Hostinger to fix API URL without rebuilding (cache / wrong build).
-  const win = window as unknown as { __VARISCA_API_BASE__?: string };
-  const runtime = win.__VARISCA_API_BASE__;
-  if (runtime && typeof runtime === 'string' && /^https?:\/\//i.test(runtime)) {
-    return stripTrailingSlashApi(runtime);
+    return configured || DEV_API_BASE;
   }
 
   const path = window.location.pathname || '';
@@ -78,9 +59,8 @@ export function getApiBase(): string {
   const isProd = !!env.PROD;
 
   if (isProd && isAdmin) {
-    if (adminUrl && /^https?:\/\//i.test(adminUrl)) return stripTrailingSlashApi(adminUrl);
     if (configured && /^https?:\/\//i.test(configured)) return stripTrailingSlashApi(configured);
-    return DEFAULT_PROD_BACKEND;
+    return '/api';
   }
 
   if (configured.startsWith('/')) {
@@ -92,7 +72,7 @@ export function getApiBase(): string {
   }
 
   if (isProd) {
-    return DEFAULT_PROD_BACKEND;
+    return '/api';
   }
 
   if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) {
@@ -111,7 +91,7 @@ export function getApiBase(): string {
     return `http://${hostname}:3001/api`;
   }
 
-  return configured || 'http://localhost:3001/api';
+  return configured || DEV_API_BASE;
 }
 
 function stripTrailingSlashApi(url: string): string {
@@ -172,7 +152,7 @@ async function request<T = any>(path: string, opts: RequestOptions = {}): Promis
 
   // Avoid sending Content-Type on GET/HEAD — it triggers a CORS preflight. Storefront
   // public GETs (no Authorization) then stay "simple" and work reliably cross-origin
-  // (e.g. Hostinger → api.varisca.in) without relying on OPTIONS handling.
+  // without relying on OPTIONS handling.
   const headers: Record<string, string> = {};
   const needsJsonContentType =
     body != null || (method !== 'GET' && method !== 'HEAD');

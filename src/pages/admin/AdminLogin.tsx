@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sparkles, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiBase } from '@/lib/api/client';
 
 /** Map API/network errors to clear copy (avoid showing “wrong password” for DNS/offline). */
 function formatAdminLoginError(raw: string): string {
@@ -23,7 +24,7 @@ function formatAdminLoginError(raw: string): string {
     t.includes('name_not_resolved') ||
     t.includes('err_network')
   ) {
-    return 'Cannot reach the API (network/DNS). Open https://api.varisca.in/api/health in this browser. If that fails, try Wi‑Fi or another network — this is not a wrong password.';
+    return `Cannot reach the API (network/DNS). Open ${getApiBase()}/health in this browser. If that fails, try Wi‑Fi or another network — this is not a wrong password.`;
   }
   return raw;
 }

@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { auth } from "../firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import axios from "axios";
+import { getApiBase } from "@/lib/api/client";
 
 export default function PhoneLogin() {
   const [phone, setPhone] = useState("");
@@ -48,7 +49,7 @@ export default function PhoneLogin() {
       const idToken = await result.user.getIdToken();
 
       // Send token to your Express backend
-      const res = await axios.post("/api/auth/phone-login", { idToken });
+      const res = await axios.post(`${getApiBase()}/auth/phone-login`, { idToken });
       
       // Store your app's JWT
       localStorage.setItem("token", res.data.token);
