@@ -277,7 +277,9 @@ export const Header = () => {
                 Track Order
               </Link>
 
-              {primaryNavLinks.map((link) => (
+              {primaryNavLinks
+                .filter((link) => link.name === 'About Us')
+                .map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
@@ -288,23 +290,6 @@ export const Header = () => {
                   {link.name}
                 </Link>
               ))}
-
-              {/* Wishlist */}
-              <Link
-                to={isAuthenticated ? "/wishlist" : "/login?redirect=wishlist"}
-                className="py-3 px-4 text-base font-medium hover:bg-muted rounded-lg transition-colors flex items-center gap-3 justify-between"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <div className="flex items-center gap-3">
-                  <Heart size={20} />
-                  Wishlist
-                </div>
-                {wishlistItems > 0 && (
-                  <span className="bg-accent text-accent-foreground text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {wishlistItems}
-                  </span>
-                )}
-              </Link>
 
               {/* Bag */}
               <Link
@@ -329,15 +314,6 @@ export const Header = () => {
                 <ThemeToggle />
               </div>
 
-              {/* Account */}
-              <Link
-                to={isAuthenticated ? "/account" : "/login"}
-                className="py-3 px-4 text-base font-medium hover:bg-muted rounded-lg transition-colors flex items-center gap-3"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <User size={20} />
-                Account
-              </Link>
             </div>
           </motion.div>
           </>

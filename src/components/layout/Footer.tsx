@@ -39,16 +39,23 @@ export const Footer = () => {
       <div className="container-custom py-12 md:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-8">
           {/* Brand */}
-          <div className="sm:col-span-2 md:col-span-2 text-center sm:text-left">
-            <Link to="/" className="inline-block mb-4">
-              <span className="font-display text-3xl font-bold">
-                Varisca<span className="text-accent">.</span>
-              </span>
+          <div className="sm:col-span-2 md:col-span-2 flex flex-col items-center text-center">
+            <Link to="/" className="inline-flex mb-4 justify-center" aria-label="Varisca home">
+              <img
+                src="/varisca%20dark%20mode.svg"
+                alt="Varisca"
+                className="h-36 w-36 object-contain sm:h-40 sm:w-40 dark:hidden"
+              />
+              <img
+                src="/Varisca%20light%20mode.svg"
+                alt="Varisca"
+                className="hidden h-36 w-36 object-contain sm:h-40 sm:w-40 dark:block"
+              />
             </Link>
             <p className="text-primary-foreground/70 mb-6 max-w-sm">
               Mastered in the Mill. Tailored for You.
             </p>
-            <div className="flex gap-4 justify-center sm:justify-start">
+            <div className="flex gap-4 justify-center">
               {socialLinks.map(({ icon: Icon, href, label }) => (
                 <a
                   key={label}

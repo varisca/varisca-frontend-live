@@ -46,7 +46,7 @@ const About = () => {
               Our Story
             </h1>
             <p className="text-xl text-muted-foreground leading-relaxed">
-              Express yourself with premium streetwear that speaks your language. Quality fashion for the bold and expressive.
+              Express yourself with premium wear that speaks your language. Quality fashion for the bold and expressive.
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed mt-4 font-medium">
               Mastered in the Mill. Tailored for You.

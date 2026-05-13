@@ -5,7 +5,7 @@ const shippingInfo = [
   {
     icon: Truck,
     title: 'Free Shipping',
-    description: 'On all orders above ₹999. No hidden fees, no minimum hassle.',
+    description: 'On all orders above Rs.999. No hidden fees, no minimum hassle.',
   },
   {
     icon: Clock,
@@ -34,7 +34,6 @@ const deliveryTimes = [
 const ShippingInfo = () => {
   return (
     <main className="min-h-screen">
-      {/* Header */}
       <section className="py-12 md:py-20 bg-muted/50">
         <div className="container-custom">
           <motion.div
@@ -52,7 +51,6 @@ const ShippingInfo = () => {
         </div>
       </section>
 
-      {/* Features */}
       <section className="py-12 md:py-20">
         <div className="container-custom">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
@@ -73,7 +71,6 @@ const ShippingInfo = () => {
             ))}
           </div>
 
-          {/* Delivery Times Table */}
           <div className="max-w-3xl mx-auto">
             <h2 className="text-2xl font-display font-bold mb-6 text-center">
               Estimated Delivery Times
@@ -84,11 +81,11 @@ const ShippingInfo = () => {
                   <tr className="bg-muted">
                     <th className="px-6 py-4 text-left font-semibold border border-border">Zone</th>
                     <th className="px-6 py-4 text-left font-semibold border border-border">Standard (Free)</th>
-                    <th className="px-6 py-4 text-left font-semibold border border-border">Express (₹99)</th>
+                    <th className="px-6 py-4 text-left font-semibold border border-border">Express (Rs.99)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {deliveryTimes.map(row => (
+                  {deliveryTimes.map((row) => (
                     <tr key={row.zone} className="hover:bg-muted/50">
                       <td className="px-6 py-4 border border-border font-medium">{row.zone}</td>
                       <td className="px-6 py-4 border border-border">{row.standard}</td>
@@ -100,17 +97,16 @@ const ShippingInfo = () => {
             </div>
           </div>
 
-          {/* Shipping Policies */}
           <div className="max-w-3xl mx-auto mt-16 space-y-8">
             <h2 className="text-2xl font-display font-bold mb-6">Shipping Policies</h2>
-            
+
             <div className="space-y-6">
               <div className="flex gap-4">
                 <CheckCircle size={24} className="text-accent flex-shrink-0 mt-1" />
                 <div>
                   <h3 className="font-semibold mb-1">Order Processing</h3>
                   <p className="text-muted-foreground">
-                    Orders placed before 2 PM IST are processed the same day. Orders after 2 PM 
+                    Orders placed before 2 PM IST are processed the same day. Orders after 2 PM
                     are processed the next business day. Weekends and holidays may delay processing.
                   </p>
                 </div>
@@ -121,8 +117,8 @@ const ShippingInfo = () => {
                 <div>
                   <h3 className="font-semibold mb-1">Tracking Your Order</h3>
                   <p className="text-muted-foreground">
-                    Once shipped, you'll receive a tracking number via email and SMS. You can 
-                    track your order in real-time through our website or the courier's platform.
+                    Once shipped, you&apos;ll receive a tracking number via email and SMS. You can
+                    track your order in real-time through our website or the courier&apos;s platform.
                   </p>
                 </div>
               </div>
@@ -132,7 +128,7 @@ const ShippingInfo = () => {
                 <div>
                   <h3 className="font-semibold mb-1">Delivery Attempts</h3>
                   <p className="text-muted-foreground">
-                    Our courier partners will make 3 delivery attempts. If all attempts fail, 
+                    Our courier partners will make 3 delivery attempts. If all attempts fail,
                     the package will be returned to us. Please ensure someone is available to receive.
                   </p>
                 </div>
@@ -143,8 +139,7 @@ const ShippingInfo = () => {
                 <div>
                   <h3 className="font-semibold mb-1">Cash on Delivery</h3>
                   <p className="text-muted-foreground">
-                    COD is available for orders up to ₹5000. An additional fee of ₹49 applies 
-                    for COD orders. Please keep exact change ready for a smooth delivery.
+                    COD is not available right now.
                   </p>
                 </div>
               </div>
