@@ -19,19 +19,28 @@ const collectionCards = [
   },
 ];
 
+const MotionLink = motion(Link);
+
 export const CollectionBanner = () => {
   return (
     <section className="py-12 sm:py-16 md:py-24">
       <div className="container-custom">
+        <div className="mb-10 text-center md:mb-12">
+          <h2 className="section-title mb-2">Trending Now</h2>
+          <p className="text-lg text-muted-foreground">Most loved pieces this week</p>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {collectionCards.map((card, index) => (
-            <motion.div
+            <MotionLink
               key={card.title}
+              to={card.link}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="relative aspect-[3/2] lg:aspect-[2/1] rounded-xl sm:rounded-2xl overflow-hidden group"
+              aria-label={`Shop ${card.title}`}
+              className="relative block aspect-[3/2] lg:aspect-[2/1] rounded-xl sm:rounded-2xl overflow-hidden group"
             >
               <img
                 src={card.image}
@@ -47,14 +56,11 @@ export const CollectionBanner = () => {
                 <p className="text-white/75 mb-5 text-sm sm:text-base md:text-lg max-w-sm">
                   {card.description}
                 </p>
-                <Link
-                  to={card.link}
-                  className="inline-flex items-center gap-2 text-accent font-semibold hover:gap-3 transition-all"
-                >
+                <span className="inline-flex items-center gap-2 text-accent font-semibold transition-all group-hover:gap-3">
                   Shop Now <ArrowRight size={18} />
-                </Link>
+                </span>
               </div>
-            </motion.div>
+            </MotionLink>
           ))}
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Clock, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { storefrontPost } from '@/lib/api/client';
 
 const contactInfo = [
   {
@@ -30,13 +31,28 @@ const Contact = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    setSubmitError('');
+
+    try {
+      await storefrontPost('/contact', formData);
+      setIsSubmitted(true);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not send your message.';
+      const isNetworkFailure = /failed to fetch|network error/i.test(message);
+      setSubmitError(
+        isNetworkFailure
+          ? 'Contact service is not available yet. Please email us directly at varisca.team@gmail.com.'
+          : `${message} You can also email us directly at varisca.team@gmail.com.`,
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -159,6 +175,12 @@ const Contact = () => {
                       placeholder="Tell us more..."
                     />
                   </div>
+
+                  {submitError && (
+                    <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                      {submitError}
+                    </p>
+                  )}
 
                   <Button 
                     type="submit" 

@@ -57,6 +57,11 @@ export const TrendingProducts = () => {
     return { tshirts: pickTshirts(list), kurtis: pickKurtis(list) };
   }, [products]);
 
+  // Temporary: hide this home block until these collections have listings.
+  if (!isLoading && tshirts.length === 0 && kurtis.length === 0) {
+    return null;
+  }
+
   // ← REMOVED: the early return that caused the layout jump
 
   return (
@@ -89,35 +94,31 @@ export const TrendingProducts = () => {
             </>
           ) : (
             <>
-              <div>
-                <h3 className="mb-6 text-center text-base font-semibold tracking-tight md:text-lg">
-                  T-Shirts
-                </h3>
-                {tshirts.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground">No t-shirt listings yet.</p>
-                ) : (
+              {tshirts.length > 0 && (
+                <div>
+                  <h3 className="mb-6 text-center text-base font-semibold tracking-tight md:text-lg">
+                    T-Shirts
+                  </h3>
                   <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-6">
                     {tshirts.map((product) => (
                       <TrendingCollectionCard key={product.id} product={product} />
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              <div>
-                <h3 className="mb-6 text-center text-base font-semibold tracking-tight md:text-lg">
-                  Kurtis
-                </h3>
-                {kurtis.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground">No kurti listings yet.</p>
-                ) : (
+              {kurtis.length > 0 && (
+                <div>
+                  <h3 className="mb-6 text-center text-base font-semibold tracking-tight md:text-lg">
+                    Kurtis
+                  </h3>
                   <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-6">
                     {kurtis.map((product) => (
                       <TrendingCollectionCard key={product.id} product={product} />
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </>
           )}
         </div>
