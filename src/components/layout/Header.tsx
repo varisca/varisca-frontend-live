@@ -13,6 +13,7 @@ import {
   Shirt,
   MapPin,
   Grid2X2,
+  Home,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
@@ -26,6 +27,7 @@ const primaryNavLinks = [
 ];
 
 const mobileBottomNavLinks = [
+  { name: 'Home', href: '/', icon: Home },
   { name: 'Collections', href: '/shop', icon: Grid2X2 },
   { name: 'Custom Order', href: '/custom-order', icon: Shirt },
 ];
@@ -33,6 +35,7 @@ const mobileBottomNavLinks = [
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCheckoutProcessing, setIsCheckoutProcessing] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,6 +55,25 @@ export const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const readProcessingState = () => {
+      setIsCheckoutProcessing(sessionStorage.getItem('variscaCheckoutProcessing') === 'true');
+    };
+    const handleProcessingState = (event: Event) => {
+      const customEvent = event as CustomEvent<boolean>;
+      setIsCheckoutProcessing(Boolean(customEvent.detail));
+    };
+
+    readProcessingState();
+    window.addEventListener('varisca-checkout-processing', handleProcessingState);
+    window.addEventListener('storage', readProcessingState);
+
+    return () => {
+      window.removeEventListener('varisca-checkout-processing', handleProcessingState);
+      window.removeEventListener('storage', readProcessingState);
+    };
+  }, []);
+
   const handleLogout = () => {
     logout();
     setIsProfileOpen(false);
@@ -60,6 +82,12 @@ export const Header = () => {
 
   const isActivePath = (href: string) =>
     location.pathname === href || (href !== '/' && location.pathname.startsWith(`${href}/`));
+
+  const blockMobileNavDuringCheckout = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!isCheckoutProcessing) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <>
@@ -248,9 +276,9 @@ export const Header = () => {
               animate={{ y: 0 }}
               exit={{ y: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 right-0 w-full bg-background/95 backdrop-blur-lg border-b border-border z-[120] md:hidden overflow-y-auto shadow-2xl max-h-[90vh]"
+              className="fixed top-0 left-0 right-0 w-full bg-background/95 backdrop-blur-lg border-b border-border z-[120] md:hidden h-[90vh] overflow-y-auto shadow-2xl"
             >
-            <div className="container-custom py-4 flex flex-col gap-1">
+            <div className="container-custom min-h-full py-4 flex flex-col gap-1">
               {/* Drawer Header with Brand and Close Button */}
               <div className="flex items-center justify-between pb-4 border-b border-border mb-2">
                 <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2">
@@ -314,6 +342,10 @@ export const Header = () => {
                 <ThemeToggle />
               </div>
 
+              <div className="mt-auto border-t border-border pt-4 text-center text-xs text-muted-foreground">
+                &copy; 2026 Varisca. All rights reserved.
+              </div>
+
             </div>
           </motion.div>
           </>
@@ -325,7 +357,7 @@ export const Header = () => {
       className="fixed inset-x-0 bottom-0 z-[100] border-t border-border bg-background/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_-18px_hsl(var(--foreground)/0.45)] backdrop-blur-md md:hidden"
       aria-label="Mobile quick navigation"
     >
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {mobileBottomNavLinks.map((link) => {
           const Icon = link.icon;
           const isActive = isActivePath(link.href);
@@ -334,9 +366,15 @@ export const Header = () => {
             <Link
               key={link.name}
               to={link.href}
-              onClick={() => setIsMenuOpen(false)}
+              aria-disabled={isCheckoutProcessing}
+              onClick={(event) => {
+                blockMobileNavDuringCheckout(event);
+                if (!isCheckoutProcessing) setIsMenuOpen(false);
+              }}
               className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition-colors ${
-                isActive
+                isCheckoutProcessing
+                  ? 'pointer-events-none cursor-not-allowed text-muted-foreground/40 opacity-50'
+                  : isActive
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
@@ -349,9 +387,15 @@ export const Header = () => {
 
         <Link
           to={isAuthenticated ? '/wishlist' : '/login?redirect=wishlist'}
-          onClick={() => setIsMenuOpen(false)}
+          aria-disabled={isCheckoutProcessing}
+          onClick={(event) => {
+            blockMobileNavDuringCheckout(event);
+            if (!isCheckoutProcessing) setIsMenuOpen(false);
+          }}
           className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition-colors ${
-            isActivePath('/wishlist')
+            isCheckoutProcessing
+              ? 'pointer-events-none cursor-not-allowed text-muted-foreground/40 opacity-50'
+              : isActivePath('/wishlist')
               ? 'bg-accent text-accent-foreground'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
@@ -369,9 +413,15 @@ export const Header = () => {
 
         <Link
           to={isAuthenticated ? '/account' : '/login'}
-          onClick={() => setIsMenuOpen(false)}
+          aria-disabled={isCheckoutProcessing}
+          onClick={(event) => {
+            blockMobileNavDuringCheckout(event);
+            if (!isCheckoutProcessing) setIsMenuOpen(false);
+          }}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition-colors ${
-            isActivePath('/account') || (!isAuthenticated && isActivePath('/login'))
+            isCheckoutProcessing
+              ? 'pointer-events-none cursor-not-allowed text-muted-foreground/40 opacity-50'
+              : isActivePath('/account') || (!isAuthenticated && isActivePath('/login'))
               ? 'bg-accent text-accent-foreground'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}

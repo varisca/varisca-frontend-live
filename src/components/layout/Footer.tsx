@@ -37,9 +37,9 @@ export const Footer = () => {
     <footer className="bg-primary text-primary-foreground">
       {/* Links Section */}
       <div className="container-custom py-12 md:py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-x-6 gap-y-8">
           {/* Brand */}
-          <div className="sm:col-span-2 md:col-span-2 flex flex-col items-center text-center">
+          <div className="col-span-2 md:col-span-2 flex flex-col items-center text-center">
             <Link to="/" className="inline-flex mb-4 justify-center" aria-label="Varisca home">
               <img
                 src="/varisca%20dark%20mode.svg"
@@ -123,7 +123,7 @@ export const Footer = () => {
           </div>
 
           {/* Policies — each legal page */}
-          <div className="sm:col-span-2 md:col-span-1">
+          <div>
             <h4 className="font-semibold mb-4 text-sm uppercase tracking-wider">Policies</h4>
             <ul className="space-y-3">
               {footerLinks.policies.map((link) => (
@@ -145,7 +145,7 @@ export const Footer = () => {
       <div className="border-t border-primary-foreground/10">
         <div className="container-custom py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-primary-foreground/60">
-            <p>© 2026 Varisca. All rights reserved.</p>
+            <p>&copy; 2026 Varisca. All rights reserved.</p>
             <div className="flex flex-wrap gap-6 justify-center md:justify-end">
               <Link to="/policy/privacy" className="hover:text-primary-foreground transition-colors">
                 Privacy Policy

@@ -72,6 +72,17 @@ const Checkout = () => {
     return () => window.clearInterval(t);
   }, [cooldownLeft]);
 
+  useEffect(() => {
+    const value = isProcessing ? 'true' : 'false';
+    sessionStorage.setItem('variscaCheckoutProcessing', value);
+    window.dispatchEvent(new CustomEvent('varisca-checkout-processing', { detail: isProcessing }));
+
+    return () => {
+      sessionStorage.setItem('variscaCheckoutProcessing', 'false');
+      window.dispatchEvent(new CustomEvent('varisca-checkout-processing', { detail: false }));
+    };
+  }, [isProcessing]);
+
   const steps: { id: CheckoutStep; label: string; icon: typeof ShoppingBag }[] = [
     { id: 'bag', label: 'BAG', icon: ShoppingBag },
     { id: 'address', label: 'ADDRESS', icon: MapPin },
