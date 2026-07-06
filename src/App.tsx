@@ -11,6 +11,7 @@ import { RecentlyViewedProvider } from "@/context/RecentlyViewedContext";
 import { CouponProvider } from "@/context/CouponContext";
 import { AddressProvider } from "@/context/AddressContext";
 import { AdminAuthProvider, AdminProtectedRoute } from "@/context/AdminAuthContext";
+import { MaintenanceGate } from "@/context/MaintenanceGate";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { CartDrawer } from "@/components/layout/CartDrawer";
@@ -107,6 +108,7 @@ const App = () => (
                   <Sonner position="bottom-right" closeButton richColors duration={4000} />
                   <BrowserRouter>
                     <ScrollToTop />
+                    <MaintenanceGate>
                     <Routes>
                       {/* ─── Admin Routes ───────────────────────── */}
                       <Route path="/admin/login" element={
@@ -201,6 +203,7 @@ const App = () => (
                       <Route path="/terms" element={<><Header /><CartDrawer /><Policy /><Footer /></>} />
                       <Route path="*" element={<><Header /><CartDrawer /><NotFound /><Footer /></>} />
                     </Routes>
+                    </MaintenanceGate>
                   </BrowserRouter>
                   </AddressProvider>
                 </CouponProvider>

@@ -5,8 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Save } from 'lucide-react';
 import { api } from '@/lib/api/client';
-
-interface GeneralConfig { storeName: string; storeUrl: string; storeEmail: string; storePhone: string; currency: string; locale: string; timezone: string; maintenanceMode: boolean; }
+import type { GeneralConfig } from '@/lib/maintenance';
 
 const defaults: GeneralConfig = { storeName: 'Varisca', storeUrl: 'https://varisca.com', storeEmail: 'varisca.team@gmail.com', storePhone: '+91 88668 60624', currency: 'INR', locale: 'en-IN', timezone: 'Asia/Kolkata', maintenanceMode: false };
 
