@@ -28,6 +28,10 @@ interface AuthContextType {
     { ok: true; expiresInSeconds: number; resendAfterSeconds: number } | { ok: false; error: string }
   >;
   verifyEmailOtp: (email: string, otp: string) => Promise<boolean>;
+  requestPhoneOtp: (phone: string) => Promise<
+    { ok: true; expiresInSeconds: number; resendAfterSeconds: number } | { ok: false; error: string }
+  >;
+  verifyPhoneOtp: (phone: string, otp: string) => Promise<boolean>;
   register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
   /** Reload customer from `/customers/auth/me` after profile changes. */
@@ -146,6 +150,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const requestPhoneOtp = useCallback(async (phone: string) => {
+    setLoading(true);
+    try {
+      const res = await customerAuthApi.requestPhoneOtp(phone);
+      toast.success('OTP sent', { description: `We sent a code to ${phone}` });
+      return { 
+        ok: true as const, 
+        expiresInSeconds: res.data.expiresInSeconds, 
+        resendAfterSeconds: res.data.resendAfterSeconds 
+      };
+    } catch (err: any) {
+      toast.error('Could not send OTP', { description: err.message || 'Please try again.' });
+      return { ok: false as const, error: err.message || 'Could not send OTP' };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const verifyPhoneOtp = useCallback(async (phone: string, otp: string): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const res = await customerAuthApi.verifyPhoneOtp(phone, otp);
+      const customer = res.data.customer;
+      const base = customerToUser(customer);
+      const userData: User = {
+        ...base,
+        first_name: base.first_name || 'OTP Customer',
+      };
+      setUser(userData);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
+      toast.success('Welcome!', { description: `Logged in as ${customer.phone}` });
+      return true;
+    } catch (err: any) {
+      toast.error('OTP verification failed', { description: err.message || 'Invalid OTP.' });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const register = useCallback(async (data: RegisterData): Promise<boolean> => {
     setLoading(true);
     try {
@@ -189,6 +233,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       requestEmailOtp,
       verifyEmailOtp,
+      requestPhoneOtp,
+      verifyPhoneOtp,
       register,
       logout,
       refreshUser,
@@ -211,6 +257,8 @@ export const useAuth = () => {
       login: async () => false,
       requestEmailOtp: async () => ({ ok: false as const, error: 'AuthProvider not mounted' }),
       verifyEmailOtp: async () => false,
+      requestPhoneOtp: async () => ({ ok: false as const, error: 'AuthProvider not mounted' }),
+      verifyPhoneOtp: async () => false,
       register: async () => false,
       logout: () => {},
       refreshUser: async () => {},
