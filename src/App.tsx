@@ -54,6 +54,7 @@ import Categories from "./pages/admin/catalog/Categories";
 import Brands from "./pages/admin/catalog/Brands";
 import Attributes from "./pages/admin/catalog/Attributes";
 import Inventory from "./pages/admin/catalog/Inventory";
+import CustomOrderProductTypes from "./pages/admin/catalog/CustomOrderProductTypes";
 
 // Admin Pages — Orders Sub
 import AdminReturns from "./pages/admin/orders/Returns";
@@ -139,6 +140,7 @@ const App = () => (
                         <Route path="catalog/brands" element={<Brands />} />
                         <Route path="catalog/attributes" element={<Attributes />} />
                         <Route path="catalog/inventory" element={<Inventory />} />
+                        <Route path="catalog/custom-order-types" element={<CustomOrderProductTypes />} />
 
                         {/* Customers */}
                         <Route path="customers" element={<AdminCustomers />} />

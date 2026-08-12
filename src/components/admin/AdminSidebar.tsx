@@ -66,6 +66,7 @@ const sidebarSections: SidebarSection[] = [
       { label: 'Brands', icon: Palette, href: '/admin/catalog/brands', permission: 'catalog.brands.manage' },
       { label: 'Attributes', icon: Layers, href: '/admin/catalog/attributes', permission: 'catalog.attributes.manage' },
       { label: 'Inventory', icon: Box, href: '/admin/catalog/inventory', permission: 'catalog.inventory.manage' },
+      { label: 'Custom Order Types', icon: Shirt, href: '/admin/catalog/custom-order-types', permission: 'catalog.view' },
     ],
   },
   {
@@ -400,4 +401,3 @@ export const AdminSidebar = ({ collapsed, onToggle }: AdminSidebarProps) => {
     </aside>
   );
 };
-

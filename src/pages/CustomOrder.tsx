@@ -9,28 +9,64 @@ import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { addCustomOrder } from '@/lib/customOrderStore';
 import { submitCustomOrderToApi } from '@/lib/customOrderApi';
+import {
+  FALLBACK_CUSTOM_ORDER_PRODUCT_TYPES,
+  getCustomOrderProductTypes,
+  type CustomOrderProductType,
+} from '@/lib/customOrderProductTypes';
 
-// Product Types
-const PRODUCT_TYPES = [
-  { id: 'tees', name: 'Crew Neck', image: '/images/mens_white_tee_lifestyle_1770113127002.png' },
-  { id: 'long_sleeve', name: 'Long Sleeve', image: '/images/long_sleeve_tshirt_1770113309403.png' },
-  { id: 'v_neck', name: 'V-Neck', image: '/images/v_neck_tshirt_1770113330903.png' }
-];
+interface ProductTypeOption {
+  id: string;
+  name: string;
+  image: string;
+  basePrice: number;
+  originalPrice: number;
+}
+
+interface ProductVarietyOption {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number;
+  discount: number;
+  image: string;
+}
 
 // Product Varieties
-const PRODUCT_VARIETIES = {
+const PRODUCT_VARIETIES: Record<string, ProductVarietyOption[]> = {
   tees: [
     { id: 'premium', name: 'Premium Cotton', price: 499, originalPrice: 749, discount: 33, image: '/images/mens_white_tee_lifestyle_1770113127002.png' },
     { id: 'oversized', name: 'Street Oversized', price: 599, originalPrice: 899, discount: 33, image: '/images/black_oversized_tee_street_style_1770113164208.png' },
     { id: 'graphic', name: 'Graphic', price: 549, originalPrice: 999, discount: 45, image: '/images/womens_graphic_tee_lifestyle_1770113146661.png' }
   ],
+  'long-sleeve': [
+    { id: 'classic', name: 'Classic Fit', price: 799, originalPrice: 1199, discount: 33, image: '/images/long_sleeve_tshirt_1770113309403.png' }
+  ],
   long_sleeve: [
     { id: 'classic', name: 'Classic Fit', price: 799, originalPrice: 1199, discount: 33, image: '/images/long_sleeve_tshirt_1770113309403.png' }
+  ],
+  'v-neck': [
+    { id: 'classic_v', name: 'Classic V-Neck', price: 699, originalPrice: 999, discount: 30, image: '/images/v_neck_tshirt_1770113330903.png' }
   ],
   v_neck: [
     { id: 'classic_v', name: 'Classic V-Neck', price: 699, originalPrice: 999, discount: 30, image: '/images/v_neck_tshirt_1770113330903.png' }
   ]
 };
+
+function mapProductType(type: CustomOrderProductType): ProductTypeOption {
+  return {
+    id: type.slug,
+    name: type.name,
+    image: type.image || '/images/mens_white_tee_lifestyle_1770113127002.png',
+    basePrice: type.base_price,
+    originalPrice: type.original_price,
+  };
+}
+
+function discountPercent(price: number, originalPrice: number): number {
+  if (originalPrice <= price || originalPrice <= 0) return 0;
+  return Math.round(((originalPrice - price) / originalPrice) * 100);
+}
 
 // Print Types
 const PRINT_TYPES = [
@@ -85,6 +121,9 @@ const CustomOrder = () => {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
+  const [productTypes, setProductTypes] = useState<ProductTypeOption[]>(
+    FALLBACK_CUSTOM_ORDER_PRODUCT_TYPES.map(mapProductType)
+  );
 
   const DRAFT_KEY = 'Varisca_custom_order_draft_v1';
   const WHATSAPP_NUMBER = '8866860624';
@@ -112,6 +151,21 @@ const CustomOrder = () => {
 
   // Policy section state
   const [showPolicySection, setShowPolicySection] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getCustomOrderProductTypes()
+      .then((types) => {
+        if (!alive || types.length === 0) return;
+        setProductTypes(types.map(mapProductType));
+      })
+      .catch(() => {
+        // Keep fallback product types if the API is unavailable.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -159,9 +213,23 @@ const CustomOrder = () => {
     }
   }, [currentStep, order, DRAFT_KEY]);
 
-  const selectedProductType = PRODUCT_TYPES.find(p => p.id === order.productType);
-  const selectedVariety = order.productType ? 
-    PRODUCT_VARIETIES[order.productType as keyof typeof PRODUCT_VARIETIES]?.find(v => v.id === order.variety) : null;
+  const selectedProductType = productTypes.find(p => p.id === order.productType);
+  const currentVarieties = useMemo(() => {
+    if (!selectedProductType) return [];
+    const configured = PRODUCT_VARIETIES[selectedProductType.id];
+    if (configured?.length) return configured;
+    return [
+      {
+        id: 'standard',
+        name: selectedProductType.name,
+        price: selectedProductType.basePrice,
+        originalPrice: selectedProductType.originalPrice,
+        discount: discountPercent(selectedProductType.basePrice, selectedProductType.originalPrice),
+        image: selectedProductType.image,
+      },
+    ];
+  }, [selectedProductType]);
+  const selectedVariety = currentVarieties.find(v => v.id === order.variety) || null;
   const selectedPrintType = PRINT_TYPES.find(p => p.id === order.printType);
   const selectedColor = COLORS.find(c => c.id === order.color);
   const selectedAddress = getSelectedAddress();
@@ -381,13 +449,13 @@ const CustomOrder = () => {
                   exit={{ opacity: 0, x: -20 }}
                 >
                   <h2 className="text-2xl font-bold mb-2">Select Your Product Type</h2>
-                  <div className="grid sm:grid-cols-3 gap-6">
-                    {PRODUCT_TYPES.map(product => (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:gap-6">
+                    {productTypes.map(product => (
                       <button
                         key={product.id}
                         onClick={() => setOrder({ ...order, productType: product.id, variety: '' })}
                         className={cn(
-                          "group relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all",
+                          "group relative aspect-[3/4] overflow-hidden rounded-lg border-2 transition-all sm:rounded-xl",
                           order.productType === product.id ? "border-primary ring-4 ring-primary/20" : "border-border hover:border-primary/50"
                         )}
                       >
@@ -398,8 +466,8 @@ const CustomOrder = () => {
                             <Check size={18} className="text-primary-foreground" />
                           </div>
                         )}
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <h3 className="text-white font-semibold text-lg">{product.name}</h3>
+                        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                          <h3 className="text-sm font-semibold leading-tight text-white sm:text-lg">{product.name}</h3>
                         </div>
                       </button>
                     ))}
@@ -417,13 +485,13 @@ const CustomOrder = () => {
                 >
                   <h2 className="text-2xl font-bold mb-2">Select Product Variety</h2>
                   <p className="text-muted-foreground mb-6">{selectedProductType?.name}</p>
-                  <div className="grid sm:grid-cols-3 gap-6">
-                    {order.productType && PRODUCT_VARIETIES[order.productType as keyof typeof PRODUCT_VARIETIES]?.map(variety => (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:gap-6">
+                    {currentVarieties.map(variety => (
                       <button
                         key={variety.id}
                         onClick={() => setOrder({ ...order, variety: variety.id })}
                         className={cn(
-                          "group relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all",
+                          "group relative aspect-[3/4] overflow-hidden rounded-lg border-2 transition-all sm:rounded-xl",
                           order.variety === variety.id ? "border-primary ring-4 ring-primary/20" : "border-border hover:border-primary/50"
                         )}
                       >
@@ -434,12 +502,14 @@ const CustomOrder = () => {
                             <Check size={18} className="text-primary-foreground" />
                           </div>
                         )}
-                        <div className="absolute top-3 left-3 bg-accent text-white text-xs px-2 py-1 rounded font-bold">
-                          {variety.discount}% OFF
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <h3 className="text-white font-semibold text-lg mb-1">{variety.name}</h3>
-                          <div className="flex items-center gap-2">
+                        {variety.discount > 0 && (
+                          <div className="absolute top-3 left-3 bg-accent text-white text-xs px-2 py-1 rounded font-bold">
+                            {variety.discount}% OFF
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                          <h3 className="mb-1 text-sm font-semibold leading-tight text-white sm:text-lg">{variety.name}</h3>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span className="text-white font-bold">₹{variety.price}</span>
                             <span className="text-white/70 line-through text-sm">₹{variety.originalPrice}</span>
                           </div>
@@ -462,13 +532,13 @@ const CustomOrder = () => {
                   <p className="text-muted-foreground mb-6">
                     Choose your preferred printing method for {selectedVariety?.name}
                   </p>
-                  <div className="grid sm:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:gap-6">
                     {PRINT_TYPES.map(type => (
                       <button
                         key={type.id}
                         onClick={() => setOrder({ ...order, printType: type.id })}
                         className={cn(
-                          "relative p-8 rounded-2xl border-2 transition-all text-center",
+                          "relative rounded-lg border-2 p-4 text-center transition-all sm:rounded-xl sm:p-6 md:p-8",
                           order.printType === type.id ? "border-primary bg-primary/5 ring-4 ring-primary/20" : "border-border hover:border-primary/50"
                         )}
                       >
@@ -477,9 +547,9 @@ const CustomOrder = () => {
                             <Check size={14} className="text-primary-foreground" />
                           </div>
                         )}
-                        <Printer size={48} className="mx-auto mb-4 text-muted-foreground" />
-                        <h3 className="font-bold text-xl mb-1">{type.name}</h3>
-                        <p className="text-sm text-muted-foreground">{type.description}</p>
+                        <Printer className="mx-auto mb-3 h-8 w-8 text-muted-foreground sm:mb-4 sm:h-10 sm:w-10 md:h-12 md:w-12" />
+                        <h3 className="mb-1 text-base font-bold sm:text-lg md:text-xl">{type.name}</h3>
+                        <p className="text-xs text-muted-foreground sm:text-sm">{type.description}</p>
                       </button>
                     ))}
                   </div>
@@ -501,7 +571,7 @@ const CustomOrder = () => {
                   <p className="text-muted-foreground mb-6">
                     Choose positions for your {selectedPrintType?.name.toLowerCase()} prints
                   </p>
-                  <div className="grid sm:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
                     {PRINT_POSITIONS.map(position => {
                       const isSelected = order.printPositions.includes(position.id);
                       return (
@@ -516,7 +586,7 @@ const CustomOrder = () => {
                             });
                           }}
                           className={cn(
-                            "relative p-6 rounded-2xl border-2 transition-all",
+                            "relative rounded-lg border-2 p-3 transition-all sm:rounded-xl sm:p-5 md:p-6",
                             isSelected ? "border-primary bg-primary/5 ring-4 ring-primary/20" : "border-border hover:border-primary/50"
                           )}
                         >
@@ -525,11 +595,11 @@ const CustomOrder = () => {
                               <Check size={14} className="text-primary-foreground" />
                             </div>
                           )}
-                          <div className="w-full aspect-square mx-auto mb-4 bg-white rounded-xl flex items-center justify-center overflow-hidden">
-                            <img src={position.image} alt={position.name} className="w-full h-full object-contain p-3" />
+                          <div className="mx-auto mb-3 flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg bg-white sm:mb-4 sm:rounded-xl">
+                            <img src={position.image} alt={position.name} className="h-full w-full object-contain p-2 sm:p-3" />
                           </div>
-                          <h3 className="font-bold text-lg mb-1">{position.name}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">Max: {position.maxSize}</p>
+                          <h3 className="mb-1 text-sm font-bold leading-tight sm:text-base md:text-lg">{position.name}</h3>
+                          <p className="mb-2 text-xs text-muted-foreground sm:text-sm">Max: {position.maxSize}</p>
                           {selectedPrintType?.id !== 'dtf' && (
                             <p className="text-accent font-semibold">+₹{position.price} ({selectedPrintType?.name})</p>
                           )}
@@ -552,13 +622,13 @@ const CustomOrder = () => {
                   <p className="text-muted-foreground mb-6">
                     {selectedVariety?.name} • {COLORS.length} colors available
                   </p>
-                  <div className="grid sm:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:gap-6">
                     {COLORS.map(color => (
                       <button
                         key={color.id}
                         onClick={() => setOrder({ ...order, color: color.id })}
                         className={cn(
-                          "relative p-6 rounded-2xl border-2 transition-all",
+                          "relative rounded-lg border-2 p-4 transition-all sm:rounded-xl sm:p-5 md:p-6",
                           order.color === color.id ? "border-primary ring-4 ring-primary/20" : "border-border hover:border-primary/50"
                         )}
                       >
@@ -568,10 +638,10 @@ const CustomOrder = () => {
                           </div>
                         )}
                         <div
-                          className="w-20 h-20 mx-auto mb-4 rounded-full border-2"
+                          className="mx-auto mb-3 h-14 w-14 rounded-full border-2 sm:mb-4 sm:h-16 sm:w-16 md:h-20 md:w-20"
                           style={{ backgroundColor: color.hex, borderColor: color.hex === '#FFFFFF' ? '#e5e5e5' : color.hex }}
                         />
-                        <h3 className="font-semibold text-center">{color.name}</h3>
+                        <h3 className="text-center text-sm font-semibold leading-tight sm:text-base">{color.name}</h3>
                       </button>
                     ))}
                   </div>
